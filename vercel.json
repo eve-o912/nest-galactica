@@ -1,5 +1,6 @@
 {
   "buildCommand": "npm install --workspaces && npm run build",
   "installCommand": "npm install --workspaces",
+  "outputDirectory": "apps/web/.next",
   "framework": null
 }
