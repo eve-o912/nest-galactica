@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { yoProtocol } from '@/services/yield/YOProtocolManager';
 import { logger } from '@/lib/logger';
-import { authenticateToken } from '@/middleware/auth';
+import { authMiddleware } from '@/middleware/auth';
+import { prisma } from '@/lib/prisma';
 
 const router = Router();
 
 // Get available YO Protocol vaults
-router.get('/vaults', authenticateToken, async (req, res) => {
+router.get('/vaults', authMiddleware, async (req, res) => {
   try {
     const vaults = await yoProtocol.getAvailableVaults();
     res.json({ success: true, data: vaults });
@@ -17,7 +18,7 @@ router.get('/vaults', authenticateToken, async (req, res) => {
 });
 
 // Get user's yield earnings
-router.get('/earnings/:userId', authenticateToken, async (req, res) => {
+router.get('/earnings/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
     const earnings = await yoProtocol.calculateEarnings(userId);
@@ -29,7 +30,7 @@ router.get('/earnings/:userId', authenticateToken, async (req, res) => {
 });
 
 // Deposit to YO Protocol
-router.post('/deposit', authenticateToken, async (req, res) => {
+router.post('/deposit', authMiddleware, async (req, res) => {
   try {
     const { userId, amount } = req.body;
     
@@ -65,7 +66,7 @@ router.post('/deposit', authenticateToken, async (req, res) => {
 });
 
 // Withdraw from YO Protocol
-router.post('/withdraw', authenticateToken, async (req, res) => {
+router.post('/withdraw', authMiddleware, async (req, res) => {
   try {
     const { userId, amount } = req.body;
     
