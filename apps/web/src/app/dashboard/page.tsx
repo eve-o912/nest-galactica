@@ -86,7 +86,7 @@ export default function Dashboard() {
           <p>Loading your dashboard...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (

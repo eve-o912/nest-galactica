@@ -2,7 +2,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import { geminiAgent } from './GeminiAgent';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import Redis from 'ioredis';
+import IORedis from 'ioredis';
 import { redis } from '@/lib/redis';
 
 /**
@@ -18,7 +18,7 @@ export class AgentScheduler {
   constructor() {
     // Create job queue
     this.queue = new Queue('agent-loops', {
-      connection: redis,
+      connection: redis as any,
       defaultJobOptions: {
         removeOnComplete: true,
         removeOnFail: false,
@@ -35,7 +35,7 @@ export class AgentScheduler {
         await geminiAgent.executeAgentLoop(userId);
       },
       {
-        connection: redis,
+        connection: redis as any,
         concurrency: 10, // Process 10 users concurrently
       }
     );
