@@ -1,0 +1,444 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  name              String?
+  monthlyIncome     Decimal   @default(0) @db.Decimal(10, 2)
+  monthlyExpenses   Decimal   @default(0) @db.Decimal(10, 2)
+  creditScore       Int       @default(700)
+  status            UserStatus @default(ACTIVE)
+  
+  wallet            Wallet?
+  nests             Nest[]
+  loans             Loan[]
+  transactions      Transaction[]
+  notifications     Notification[]
+  agentDecisions    AgentDecision[]
+  interestPayments  InterestPayment[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([email])
+  @@index([status])
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+// ============================================================================
+// WALLET & VAULTS (WDK Integration)
+// ============================================================================
+
+model Wallet {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  address           String    @unique  // WDK wallet address
+  type              WalletType
+  encryptedBackup   String?   // Encrypted private key backup
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vaults            Vault[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([address])
+}
+
+enum WalletType {
+  NON_CUSTODIAL
+  MULTI_SIG
+}
+
+model Vault {
+  id                String    @id @default(cuid())
+  walletId          String
+  address           String    @unique  // WDK vault address
+  name              String
+  type              VaultType
+  balance           Decimal   @default(0) @db.Decimal(18, 6)
+  nestId            String?
+  
+  wallet            Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  nest              Nest?     @relation(fields: [nestId], references: [id])
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([walletId])
+  @@index([type])
+  @@index([nestId])
+}
+
+enum VaultType {
+  EMERGENCY
+  SAVINGS
+  LENDING
+  GOAL
+}
+
+// ============================================================================
+// NESTS (Savings Goals)
+// ============================================================================
+
+model Nest {
+  id                String    @id @default(cuid())
+  userId            String
+  name              String
+  description       String?
+  type              NestType
+  targetAmount      Decimal   @db.Decimal(10, 2)
+  currentAmount     Decimal   @default(0) @db.Decimal(10, 2)
+  deadline          DateTime?
+  priority          Int       @default(3)  // 1=highest, 5=lowest
+  status            NestStatus @default(ACTIVE)
+  allocationPercentage Decimal @default(0) @db.Decimal(3, 2)  // 0.00-1.00
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vaults            Vault[]
+  transactions      Transaction[]
+  loans             Loan[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([deadline])
+}
+
+enum NestType {
+  EMERGENCY
+  WEDDING
+  VACATION
+  HOUSE
+  EDUCATION
+  CAR
+  BUSINESS
+  CUSTOM
+}
+
+enum NestStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+// ============================================================================
+// LOANS (Bridge Loans)
+// ============================================================================
+
+model Loan {
+  id                String    @id @default(cuid())
+  userId            String
+  nestId            String?
+  amount            Decimal   @db.Decimal(10, 2)
+  apr               Decimal   @db.Decimal(4, 4)  // e.g., 0.0600 = 6%
+  durationMonths    Int
+  monthlyPayment    Decimal   @db.Decimal(10, 2)
+  totalInstallments Int
+  paidInstallments  Int       @default(0)
+  status            LoanStatus @default(OFFERED)
+  riskScore         Int?      // 1-10
+  
+  offeredAt         DateTime?
+  acceptedAt        DateTime?
+  disbursedAt       DateTime?
+  repaidAt          DateTime?
+  defaultedAt       DateTime?
+  gracePeriodEndsAt DateTime?
+  
+  transactionHash   String?   // WDK disbursement tx hash
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nest              Nest?     @relation(fields: [nestId], references: [id])
+  repaymentSchedule RepaymentSchedule[]
+  collateral        Collateral?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([gracePeriodEndsAt])
+}
+
+enum LoanStatus {
+  OFFERED
+  ACCEPTED
+  ACTIVE
+  GRACE_PERIOD
+  REPAID
+  DEFAULTED
+  REJECTED
+}
+
+model RepaymentSchedule {
+  id                String    @id @default(cuid())
+  loanId            String
+  installmentNumber Int
+  amount            Decimal   @db.Decimal(10, 2)
+  dueDate           DateTime
+  status            RepaymentStatus @default(SCHEDULED)
+  
+  paidAt            DateTime?
+  missedAt          DateTime?
+  transactionHash   String?
+  
+  loan              Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@unique([loanId, installmentNumber])
+  @@index([status])
+  @@index([dueDate])
+}
+
+enum RepaymentStatus {
+  SCHEDULED
+  PAID
+  MISSED
+  LATE
+}
+
+model Collateral {
+  id                String    @id @default(cuid())
+  userId            String
+  loanId            String    @unique
+  amount            Decimal   @db.Decimal(10, 2)
+  timeLockId        String    @unique  // WDK TimeLock ID
+  status            CollateralStatus @default(LOCKED)
+  unlockConditions  Json      // Conditions for unlock
+  
+  lockedAt          DateTime  @default(now())
+  unlockedAt        DateTime?
+  liquidatedAt      DateTime?
+  liquidationTxHash String?
+  
+  loan              Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([status])
+  @@index([timeLockId])
+}
+
+enum CollateralStatus {
+  LOCKED
+  UNLOCKED
+  LIQUIDATED
+}
+
+// ============================================================================
+// TRANSACTIONS (Blockchain Events)
+// ============================================================================
+
+model Transaction {
+  id                String    @id @default(cuid())
+  userId            String
+  nestId            String?
+  loanId            String?
+  type              TransactionType
+  amount            Decimal   @db.Decimal(18, 6)
+  token             TokenType @default(USDT)
+  fromAddress       String
+  toAddress         String
+  hash              String    @unique  // Blockchain tx hash
+  status            TransactionStatus @default(PENDING)
+  confirmations     Int       @default(0)
+  metadata          Json?
+  
+  confirmedAt       DateTime?
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nest              Nest?     @relation(fields: [nestId], references: [id])
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([hash])
+  @@index([createdAt])
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  LOAN_DISBURSEMENT
+  LOAN_REPAYMENT
+  INTEREST_PAYMENT
+  COLLATERAL_LOCK
+  COLLATERAL_UNLOCK
+  COLLATERAL_LIQUIDATION
+  AUTO_ALLOCATION
+}
+
+enum TokenType {
+  USDT
+  XAUT
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+// ============================================================================
+// AGENT DECISIONS & NOTIFICATIONS
+// ============================================================================
+
+model AgentDecision {
+  id                String    @id @default(cuid())
+  userId            String
+  action            String    // e.g., "rebalance_allocations", "offer_bridge_loan"
+  reasoning         String    @db.Text  // Claude's explanation
+  confidence        Decimal   @db.Decimal(3, 2)  // 0.00-1.00
+  parameters        Json      // Action-specific params
+  status            DecisionStatus @default(PENDING)
+  
+  executedAt        DateTime?
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum DecisionStatus {
+  PENDING
+  EXECUTED
+  FAILED
+  CANCELLED
+}
+
+model Notification {
+  id                String    @id @default(cuid())
+  userId            String
+  type              NotificationType
+  title             String
+  message           String    @db.Text
+  actionRequired    Boolean   @default(false)
+  metadata          Json?
+  readAt            DateTime?
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([readAt])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  REBALANCE
+  LOAN_OFFER
+  SPENDING_ALERT
+  GOAL_MILESTONE
+  REPAYMENT_DUE
+  REPAYMENT_MISSED
+  COLLATERAL_WARNING
+  GENERAL
+}
+
+// ============================================================================
+// ECONOMICS & LENDING POOL
+// ============================================================================
+
+model LendingPool {
+  id                String    @id @default(cuid())
+  totalDeposits     Decimal   @default(0) @db.Decimal(18, 6)
+  totalLoaned       Decimal   @default(0) @db.Decimal(18, 6)
+  availableLiquidity Decimal  @default(0) @db.Decimal(18, 6)
+  totalInterestEarned Decimal @default(0) @db.Decimal(18, 6)
+  utilizationRate   Decimal   @default(0) @db.Decimal(3, 2)
+  averageAPR        Decimal   @default(0) @db.Decimal(4, 4)
+  
+  updatedAt         DateTime  @updatedAt
+}
+
+model InterestPayment {
+  id                String    @id @default(cuid())
+  userId            String
+  amount            Decimal   @db.Decimal(18, 6)
+  period            DateTime
+  type              InterestType
+  apy               Decimal?  @db.Decimal(4, 4)
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([period])
+}
+
+enum InterestType {
+  EARNED
+  PAID
+}
+
+model PlatformRevenue {
+  id                String    @id @default(cuid())
+  source            RevenueSource
+  amount            Decimal   @db.Decimal(18, 6)
+  period            DateTime
+  description       String?
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([period])
+  @@index([source])
+}
+
+enum RevenueSource {
+  INTEREST_SPREAD
+  FEES
+  LIQUIDATION
+  OTHER
+}
+
+// ============================================================================
+// ANALYTICS & AUDIT
+// ============================================================================
+
+model ConversationHistory {
+  id                String    @id @default(cuid())
+  userId            String
+  role              String    // "user" or "assistant"
+  content           String    @db.Text
+  metadata          Json?
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
+}
