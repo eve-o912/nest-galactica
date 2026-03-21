@@ -2,5 +2,10 @@
   "buildCommand": "npm install --workspaces && cd apps/web && npm run build",
   "installCommand": "npm install --workspaces",
   "outputDirectory": "apps/web/.next",
-  "framework": null
+  "framework": null,
+  "functions": {
+    "api.js": {
+      "runtime": "nodejs18.x"
+    }
+  }
 }
