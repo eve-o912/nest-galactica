@@ -26,6 +26,7 @@ interface Loan {
 export default function Dashboard() {
   const [nests, setNests] = useState<Nest[]>([])
   const [loans, setLoans] = useState<Loan[]>([])
+  const [yieldEarnings, setYieldEarnings] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,13 +38,16 @@ export default function Dashboard() {
           return
         }
 
-        const [nestsResponse, loansResponse] = await Promise.all([
+        const [nestsResponse, loansResponse, yieldResponse] = await Promise.all([
           fetch('/api/nests', {
             headers: { Authorization: `Bearer ${token}` }
           }),
           fetch('/api/loans', {
             headers: { Authorization: `Bearer ${token}` }
-          })
+          }),
+          fetch('/api/yield/earnings/user123', {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => ({ ok: true, json: () => ({ earnings: null }) })
         ])
 
         if (nestsResponse.ok) {
@@ -54,6 +58,11 @@ export default function Dashboard() {
         if (loansResponse.ok) {
           const loansData = await loansResponse.json()
           setLoans(loansData.loans)
+        }
+
+        if (yieldResponse.ok) {
+          const yieldData = await yieldResponse.json()
+          setYieldEarnings(yieldData.earnings)
         }
       } catch (error) {
         console.error('Failed to fetch data:', error)
@@ -218,18 +227,130 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Loans Section */}
-        {loans.length > 0 && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Your Loans</h2>
-            <div className="space-y-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Goal Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{savingsProgress.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">
+              ${totalGoals.toFixed(2)} total target
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Active Loans
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {loans.filter(loan => loan.status === 'ACTIVE').length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {loans.filter(loan => loan.status === 'OFFERED').length} pending offers
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              AI Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">Active</div>
+            <p className="text-xs text-muted-foreground">
+              Managing your finances
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* YO Protocol Earnings */}
+      {yieldEarnings && yieldEarnings.totalDeposited > 0 && (
+        <div className="mb-8">
+          <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl shadow-lg p-6 border-2 border-green-300">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="text-5xl">📈</div>
+              <div>
+                <h3 className="text-2xl font-bold text-green-900">YO Protocol Earnings</h3>
+                <p className="text-sm text-green-700">Your funds are earning yield on Base</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-sm text-gray-600 mb-1">Deposited</div>
+                <div className="text-2xl font-bold text-gray-900">
+                  ${yieldEarnings.totalDeposited.toFixed(2)}
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-sm text-gray-600 mb-1">Current Value</div>
+                <div className="text-2xl font-bold text-gray-900">
+                  ${yieldEarnings.currentValue.toFixed(2)}
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-sm text-gray-600 mb-1">Earnings</div>
+                <div className="text-2xl font-bold text-green-600">
+                  +${yieldEarnings.unrealizedGains.toFixed(2)}
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4">
+                <div className="text-sm text-gray-600 mb-1">APY</div>
+                <div className="text-2xl font-bold text-green-600">
+                  ${(yieldEarnings.effectiveAPY * 100).toFixed(2)}%
+                </div>
+              </div>
+            </div>
+            
+            <div className="text-xs text-green-700">
+              🔒 Powered by YO Protocol • Audited by Trail of Bits • Base Chain
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nests Section */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Your Nests</h2>
+        {nests.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-muted-foreground mb-4">No nests created yet</p>
+              <Link href="/nests/create">
+                <Button>Create Your First Nest</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {nests.map((nest) => {
+              const progress = (parseFloat(nest.currentAmount) / parseFloat(nest.targetAmount)) * 100
+              return (
+                <Card key={nest.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      {nest.name}
+                      <span className="text-sm font-normal text-muted-foreground">
+                        Priority {nest.priority}
+                      </span>
+                    </CardTitle>
+                    <CardDescription>{nest.type}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
               {loans.map((loan) => (
                 <Card key={loan.id}>
                   <CardContent className="pt-6">

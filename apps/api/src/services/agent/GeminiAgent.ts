@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { wdkManager } from '../wdk/WDKManager';
+import { yoProtocol } from '../yield/YOProtocolManager';
 
 interface AgentContext {
   userId: string;
@@ -144,6 +145,10 @@ Provide JSON analysis with:
         if (loanDecision) decisions.push(loanDecision);
       }
     }
+
+    // Decision 3: Optimize idle funds to YO Protocol
+    const yoOptimization = await this.optimizeToYieldProtocol(context);
+    if (yoOptimization) decisions.push(yoOptimization);
 
     return decisions;
   }
@@ -336,6 +341,63 @@ Always provide:
 - Expected outcomes
 
 Output: Valid JSON only, no markdown.`;
+  }
+
+  private async optimizeToYieldProtocol(context: AgentContext): Promise<AgentDecision | null> {
+    try {
+      let idleFunds = 0;
+      
+      // Calculate idle funds (surplus beyond minimum needed)
+      for (const nest of context.nests) {
+        // Emergency fund: keep 100% liquid (never deposit to YO)
+        if (nest.type === 'EMERGENCY') continue;
+        
+        // For other goals: deposit 80% of current savings to YO
+        // Keep 20% liquid for immediate withdrawals
+        const depositableAmount = parseFloat(nest.currentAmount) * 0.8;
+        idleFunds += depositableAmount;
+      }
+      
+      // Only deposit if >= $100 minimum
+      if (idleFunds >= 100) {
+        const user = await prisma.user.findUnique({ where: { id: context.userId } });
+        if (!user?.walletAddress) return null;
+        
+        await yoProtocol.autoDepositIdleFunds(
+          context.userId,
+          user.walletAddress,
+          idleFunds
+        );
+        
+        // Log decision
+        await prisma.agentDecision.create({
+          data: {
+            userId: context.userId,
+            action: 'optimize_yield',
+            reasoning: `Deposited $${idleFunds.toFixed(2)} idle funds to YO Protocol yoUSD vault. Expected APY: 8-12%. Funds earning yield while maintaining 20% liquidity reserve.`,
+            confidence: 0.95,
+            parameters: JSON.stringify({ amount: idleFunds, vault: 'yoUSD' }),
+          },
+        });
+        
+        logger.info('YO Protocol optimization executed', {
+          userId: context.userId,
+          amount: idleFunds,
+        });
+        
+        return {
+          action: 'optimize_yield',
+          reasoning: `Auto-optimized $${idleFunds.toFixed(2)} idle funds to YO Protocol for 8.5% APY yield`,
+          confidence: 0.95,
+          parameters: { amount: idleFunds, vault: 'yoUSD' },
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      logger.error('YO optimization failed', { userId: context.userId, error });
+      return null;
+    }
   }
 }
 

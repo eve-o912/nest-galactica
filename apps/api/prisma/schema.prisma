@@ -28,6 +28,7 @@ model User {
   notifications     Notification[]
   agentDecisions    AgentDecision[]
   interestPayments  InterestPayment[]
+  yieldPositions     YieldPosition[]
   
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -424,6 +425,30 @@ enum RevenueSource {
   FEES
   LIQUIDATION
   OTHER
+}
+
+// ============================================================================
+// YIELD POSITIONS (YO Protocol)
+// ============================================================================
+
+model YieldPosition {
+  id                   String   @id @default(cuid())
+  userId               String
+  vaultAddress         String   // YO Protocol vault address
+  vaultName            String   // "yoUSD", "yoETH", etc.
+  depositedAmount      Float    // Amount deposited in USD
+  shares               String   // Number of vault shares (as string for BigInt)
+  sharePriceAtDeposit  Float    // Share price at time of deposit
+  apy                  Float    // APY at time of deposit
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([vaultAddress])
+  @@index([createdAt])
 }
 
 // ============================================================================

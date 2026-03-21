@@ -18,6 +18,7 @@ import nestsRoutes from './routes/nests';
 import loansRoutes from './routes/loans';
 import transactionsRoutes from './routes/transactions';
 import agentRoutes from './routes/agent';
+import yieldRoutes from './routes/yield';
 
 // Services
 import { agentScheduler } from './services/agent/AgentScheduler';
@@ -69,6 +70,7 @@ app.use('/api/nests', authMiddleware, nestsRoutes);
 app.use('/api/loans', authMiddleware, loansRoutes);
 app.use('/api/transactions', authMiddleware, transactionsRoutes);
 app.use('/api/agent', authMiddleware, agentRoutes);
+app.use('/api/yield', authMiddleware, yieldRoutes);
 
 // WebSocket setup
 const wsManager = new WebSocketManager(io);
