@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ============================================================================
+// USERS & WALLETS
+// ============================================================================
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password        String
+  name            String?
+  monthlyIncome   Float     @default(0)
+  monthlyExpenses Float     @default(0)
+  creditScore     Int       @default(700)
+  
+  walletAddress   String?
+  walletBackup    String?   // Encrypted private key backup
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  goals           Goal[]
+  deposits        Deposit[]
+  loans           Loan[]
+  messages        Message[]
+  yieldPositions  YieldPosition[]
+  
+  @@index([email])
+}
+
+// ============================================================================
+// GOALS (Nests)
+// ============================================================================
+
+model Goal {
+  id                String    @id @default(cuid())
+  userId            String
+  name              String
+  type              String    // "emergency", "wedding", "vacation", "house", etc.
+  targetAmount      Float
+  currentAmount     Float     @default(0)
+  deadline          DateTime?
+  priority          Int       @default(3)  // 1=highest, 5=lowest
+  status            String    @default("active") // "active", "completed", "paused"
+  allocationPercent Float     @default(0)  // Auto-calculated by agent
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deposits          Deposit[]
+  loans             Loan[]
+  
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+}
+
+// ============================================================================
+// DEPOSITS
+// ============================================================================
+
+model Deposit {
+  id        String   @id @default(cuid())
+  userId    String
+  goalId    String?  // Can be null for general deposits
+  amount    Float
+  txHash    String?  // WDK transaction hash
+  status    String   @default("confirmed")
+  
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal      Goal?    @relation(fields: [goalId], references: [id])
+  
+  @@index([userId])
+  @@index([goalId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// BRIDGE LOANS
+// ============================================================================
+
+model Loan {
+  id                String   @id @default(cuid())
+  userId            String
+  goalId            String   // Loan is for specific goal
+  
+  amount            Float
+  apr               Float    // e.g., 0.06 = 6%
+  durationMonths    Int
+  monthlyPayment    Float
+  totalInstallments Int
+  paidInstallments  Int      @default(0)
+  
+  status            String   @default("offered") // "offered", "accepted", "active", "repaid", "defaulted"
+  riskScore         Int?     // 1-10
+  
+  offeredAt         DateTime?
+  acceptedAt        DateTime?
+  disbursedAt       DateTime?
+  repaidAt          DateTime?
+  
+  collateralAmount  Float?   // Locked savings
+  collateralLocked  Boolean  @default(false)
+  
+  disbursementTxHash String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal              Goal     @relation(fields: [goalId], references: [id])
+  repayments        Repayment[]
+  
+  @@index([userId])
+  @@index([goalId])
+  @@index([status])
+}
+
+// ============================================================================
+// LOAN REPAYMENTS
+// ============================================================================
+
+model Repayment {
+  id                String   @id @default(cuid())
+  loanId            String
+  installmentNumber Int
+  amount            Float
+  dueDate           DateTime
+  status            String   @default("scheduled") // "scheduled", "paid", "missed"
+  
+  paidAt            DateTime?
+  txHash            String?
+  
+  createdAt         DateTime @default(now())
+  
+  loan              Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  
+  @@unique([loanId, installmentNumber])
+  @@index([loanId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+// ============================================================================
+// YIELD POSITIONS (YO Protocol)
+// ============================================================================
+
+model YieldPosition {
+  id                   String   @id @default(cuid())
+  userId               String
+  vaultAddress         String   // YO Protocol vault address
+  vaultName            String   // "yoUSD", "yoETH", etc.
+  depositedAmount      Float    // Amount deposited in USD
+  shares               String   // Number of vault shares (as string for BigInt)
+  sharePriceAtDeposit  Float    // Share price at time of deposit
+  apy                  Float    // APY at time of deposit
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([vaultAddress])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// AI CHAT MESSAGES
+// ============================================================================
+
+model Message {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String   // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// AGENT DECISIONS (Audit Trail)
+// ============================================================================
+
+model AgentDecision {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String   // "rebalance", "offer_loan", "spending_alert"
+  reasoning  String   // AI explanation
+  confidence Float    // 0.0 - 1.0
+  parameters String   // JSON
+  status     String   @default("executed") // "executed", "failed"
+  
+  executedAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+}
