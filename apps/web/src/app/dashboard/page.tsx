@@ -37,13 +37,13 @@ export default function Dashboard() {
         }
 
         const [nestsResponse, loansResponse, yieldResponse] = await Promise.all([
-          fetch('/api/nests', {
+          fetch('/api/index?route=nests', {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          fetch('/api/loans', {
+          fetch('/api/index?route=loans', {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          fetch('/api/yield/earnings/user123', {
+          fetch('/api/index?route=yield', {
             headers: { Authorization: `Bearer ${token}` }
           }).catch(() => ({ ok: true, json: () => ({ earnings: null }) }))
         ])

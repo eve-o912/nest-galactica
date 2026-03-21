@@ -1,18 +1,9 @@
-// Simple API handler for Vercel serverless
-export default function handler(req, res) {
-  const { url, method } = req
+import { NextApiRequest, NextApiResponse } from 'next'
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { query, method } = req
   
-  // Handle CORS
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  
-  if (method === 'OPTIONS') {
-    res.status(200).end()
-    return
-  }
-  
-  if (url === '/api/nests' && method === 'GET') {
+  if (method === 'GET' && query.route === 'nests') {
     res.status(200).json({
       nests: [
         {
@@ -36,14 +27,14 @@ export default function handler(req, res) {
     return
   }
   
-  if (url === '/api/loans' && method === 'GET') {
+  if (method === 'GET' && query.route === 'loans') {
     res.status(200).json({
       loans: []
     })
     return
   }
   
-  if (url.includes('/api/yield/earnings/') && method === 'GET') {
+  if (method === 'GET' && query.route === 'yield') {
     res.status(200).json({
       earnings: {
         total: '45.67',
