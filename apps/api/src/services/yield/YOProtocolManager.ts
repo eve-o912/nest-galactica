@@ -11,7 +11,7 @@
  * - yoEUR (EURC) - Euro stablecoin yield
  */
 
-import { prisma } from '../../lib/db';
+import { prisma } from '@/lib/prisma';
 
 // YO Protocol Vault Addresses (Base Chain)
 const YO_VAULTS = {
