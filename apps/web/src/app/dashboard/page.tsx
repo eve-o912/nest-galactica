@@ -47,7 +47,7 @@ export default function Dashboard() {
           }),
           fetch('/api/yield/earnings/user123', {
             headers: { Authorization: `Bearer ${token}` }
-          }).catch(() => ({ ok: true, json: () => ({ earnings: null }) })
+          }).catch(() => ({ ok: true, json: () => ({ earnings: null }) }))
         ])
 
         if (nestsResponse.ok) {
