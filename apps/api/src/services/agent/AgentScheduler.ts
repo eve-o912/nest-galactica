@@ -1,8 +1,9 @@
-import { Queue, Worker } from 'bullmq';
+import { Queue, Worker, Job } from 'bullmq';
 import { geminiAgent } from './GeminiAgent';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import Redis from 'ioredis';
+import { redis } from '@/lib/redis';
 
 /**
  * Agent Scheduler - Manages agent execution for all users
@@ -29,7 +30,7 @@ export class AgentScheduler {
     // Create worker
     this.worker = new Worker(
       'agent-loops',
-      async (job) => {
+      async (job: Job) => {
         const { userId } = job.data;
         await geminiAgent.executeAgentLoop(userId);
       },

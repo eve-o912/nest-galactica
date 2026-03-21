@@ -116,7 +116,7 @@ export class AutonomousAgent {
 
     const financialHealth = {
       emergencyFundStatus:
-        emergencyMonths === 0 ? 'none' : emergencyMonths >= 3 ? 'adequate' : 'building',
+        (emergencyMonths === 0 ? 'none' : emergencyMonths >= 3 ? 'adequate' : 'building') as 'none' | 'building' | 'adequate',
       debtLevel: 'none' as const, // TODO: Calculate from active loans
       savingsRate: 0, // TODO: Calculate from transaction history
       creditScore: user.creditScore,

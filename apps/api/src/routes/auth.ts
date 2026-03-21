@@ -3,9 +3,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
-import { prisma } from '../lib/prisma';
+import { prisma, logger } from '../lib/prisma';
 import { createError } from '../middleware/errorHandler';
-import { logger } from '../lib/prisma';
 
 const router = Router();
 
@@ -54,8 +53,8 @@ router.post('/signup', validate(signupSchema), async (req, res) => {
     // Create JWT token
     const token = jwt.sign(
       { userId: user.id },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '7d' }
     );
 
     logger.info('User signed up', { userId: user.id, email });
@@ -98,8 +97,8 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     // Create JWT token
     const token = jwt.sign(
       { userId: user.id },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '7d' }
     );
 
     logger.info('User logged in', { userId: user.id, email });

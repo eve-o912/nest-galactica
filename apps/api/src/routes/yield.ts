@@ -20,11 +20,11 @@ router.get('/vaults', authMiddleware, async (req, res) => {
 // Get user's yield earnings
 router.get('/earnings/:userId', authMiddleware, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
     const earnings = await yoProtocol.calculateEarnings(userId);
     res.json({ success: true, data: earnings });
   } catch (error) {
-    logger.error('Failed to calculate earnings', { userId: req.params.userId, error });
+    logger.error('Failed to calculate earnings', { userId: Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId, error });
     res.status(500).json({ success: false, error: 'Failed to calculate earnings' });
   }
 });

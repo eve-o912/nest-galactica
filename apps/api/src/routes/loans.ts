@@ -52,13 +52,13 @@ router.post('/:loanId/respond', authenticate, validate(acceptLoanSchema), async 
 
     if (accept) {
       // Accept loan - create collateral and disburse funds
-      const collateralAmount = (parseFloat(loan.amount) * 1.2).toFixed(2); // 120% collateral
+      const collateralAmount = (parseFloat(Array.isArray(loan.amount) ? loan.amount[0] : loan.amount) * 1.2).toFixed(2); // 120% collateral
       
       // Create collateral lock
       await wdkManager.createCollateralLock(userId, loanId, collateralAmount);
       
       // Disburse loan
-      await wdkManager.disburseLoan(userId, loanId, loan.amount);
+      await wdkManager.disburseLoan(userId, loanId, Array.isArray(loan.amount) ? loan.amount[0] : loan.amount);
       
       // Update loan status
       await prisma.loan.update({

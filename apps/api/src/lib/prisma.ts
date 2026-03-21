@@ -29,7 +29,7 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient({
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 // Log database queries in development
-prisma.$on('query', (e) => {
+prisma.$on('query', (e: any) => {
   if (process.env.NODE_ENV === 'development') {
     logger.debug('Query: ' + e.query);
     logger.debug('Params: ' + e.params);
@@ -37,14 +37,16 @@ prisma.$on('query', (e) => {
   }
 });
 
-prisma.$on('error', (e) => {
+prisma.$on('error', (e: any) => {
   logger.error('Prisma error:', e);
 });
 
-prisma.$on('info', (e) => {
+prisma.$on('info', (e: any) => {
   logger.info('Prisma info:', e);
 });
 
-prisma.$on('warn', (e) => {
+prisma.$on('warn', (e: any) => {
   logger.warn('Prisma warning:', e);
 });
+
+export { logger };
