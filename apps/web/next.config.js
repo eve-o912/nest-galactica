@@ -8,6 +8,10 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   },
+  // Disable App Router
+  experimental: {
+    appDir: false,
+  },
 };
 
 module.exports = nextConfig;
