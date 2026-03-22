@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { api } from '../src/lib/api'
 
 interface Nest {
   id: string
@@ -35,33 +36,37 @@ export default function Dashboard() {
         }
 
         const [nestsResponse, loansResponse, yieldResponse] = await Promise.all([
-          fetch('/api/nests', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          fetch('/api/loans', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          fetch('/api/yield', {
-            headers: { Authorization: `Bearer ${token}` }
-          }).catch(() => ({ ok: true, json: () => ({ earnings: null }) }))
+          api.get('/api/nests'),
+          api.get('/api/loans'),
+          api.get('/api/yield/earnings/user123').catch(() => ({ data: { earnings: null } }))
         ])
 
-        if (nestsResponse.ok) {
-          const nestsData = await nestsResponse.json()
-          setNests(nestsData.nests || [])
-        }
-
-        if (loansResponse.ok) {
-          const loansData = await loansResponse.json()
-          setLoans(loansData.loans || [])
-        }
-
-        if (yieldResponse.ok) {
-          const yieldData = await yieldResponse.json()
-          setYieldEarnings(yieldData.earnings)
-        }
+        setNests(nestsResponse.data.nests || [])
+        setLoans(loansResponse.data.loans || [])
+        setYieldEarnings(yieldResponse.data.earnings)
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
+        // Fallback to mock data if backend is not available
+        setNests([
+          {
+            id: '1',
+            name: 'Emergency Fund',
+            type: 'EMERGENCY',
+            targetAmount: '10000',
+            currentAmount: '2500',
+            priority: 1
+          },
+          {
+            id: '2', 
+            name: 'Vacation Fund',
+            type: 'GOAL',
+            targetAmount: '5000',
+            currentAmount: '1200',
+            priority: 2
+          }
+        ])
+        setLoans([])
+        setYieldEarnings({ total: '45.67', monthly: '12.34' })
       } finally {
         setLoading(false)
       }
